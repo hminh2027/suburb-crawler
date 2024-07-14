@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import axios from 'axios';
 import * as Cheerio from 'cheerio';
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
+import { merge } from 'lodash';
 import { ADDRESS_BBOX } from 'src/constants';
 import { GoogleSheetsService } from 'src/lib/google-sheets/google-sheets.service';
 import {
@@ -15,6 +16,63 @@ import {
 @Injectable()
 export class SyncService {
   constructor(private readonly googleSheetsService: GoogleSheetsService) {}
+
+  syncAllStatsToCouncil(council) {
+    const baseUrl = 'https://www.microburbs.com.au/heat-map';
+
+    // Around 200 stats. I want to make 5 requests every 0.5 minutes (use setInterval) (stop the timer when all requests are done)
+
+    const rawStatList = readFileSync('crawler/stat-list.json', 'utf8');
+
+    // And, let just do the 101 to end of list
+
+    const halfStatList = JSON.parse(rawStatList)
+      .slice(101)
+      .map((item) => Object.values(item)[0]);
+
+    const timer = setInterval(() => {
+      if (halfStatList.length === 0) {
+        clearInterval(timer);
+      } else {
+        // Take 5 stats from the list and remove them from the list
+        const statList = halfStatList.splice(0, 5);
+        const promises = statList.map((statName) => {
+          const rawPayload = genRawPayload({
+            statName,
+            bboxArea: ADDRESS_BBOX.SYDNEY,
+          });
+
+          return axios
+            .post(baseUrl, rawPayload)
+            .then((response) => {
+              console.log(response);
+              const data: object = response.data.data;
+              const transformedData = transformData(
+                Object.values(data),
+                statName,
+              );
+
+              return transformedData;
+            })
+            .catch((error) => {
+              console.error(error);
+            });
+        });
+
+        Promise.all(promises).then((values) => {
+          console.log(values);
+          const localData = readSuburbFromFile(council);
+
+          const mergedValues = values.reduce((acc, curr) => {
+            return merge(acc, curr);
+          }, {});
+          const mergedData = mergeData(localData, mergedValues);
+
+          writeSuburbToFile(mergedData, council);
+        });
+      }
+    }, 30000);
+  }
 
   syncByStatName(statName) {
     // const baseUrl = 'https://www.microburbs.com.au/heat-map';

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UsePipes } from '@nestjs/common';
+import { Controller, Get, Param, Query, UsePipes } from '@nestjs/common';
 import { SyncService } from './sync.service';
 // import { StatName } from 'src/constants';
 import { KebabToCamelCasePipe } from './pipes/sync.pipe';
@@ -31,5 +31,12 @@ export class SyncController {
   async syncStatList() {
     const data = await this.syncService.syncStatList();
     return data;
+  }
+
+  @Get(':council/all')
+  async syncAllStatsToCouncil(@Param('council') council) {
+    console.log(council);
+    await this.syncService.syncAllStatsToCouncil(council);
+    return 'Syncing all stats to council...';
   }
 }
