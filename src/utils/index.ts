@@ -22,8 +22,12 @@ export const writeSuburbToFile = (data, council) => {
 };
 
 export const readSuburbFromFile = (council) => {
-  const rawData = readFileSync(`crawler/${council}.json`, 'utf8');
-  return JSON.parse(rawData);
+  try {
+    const rawData = readFileSync(`crawler/${council}.json`, 'utf8');
+    return JSON.parse(rawData);
+  } catch (error) {
+    return {};
+  }
 };
 
 export const transformData = (data: any[], statName: string) => {
@@ -44,6 +48,15 @@ export const transformData = (data: any[], statName: string) => {
 
 export const mergeData = (data1, data2) => {
   const resObj = {};
+  // Normal merge if data1 or data2 is empty
+  if (!Object.keys(data1).length || !Object.keys(data2).length) {
+    return {
+      ...data1,
+      ...data2,
+    };
+  }
+
+  // Merge two objects
   Object.keys(data1).forEach((key) => {
     resObj[key] = {
       ...data1[key],
